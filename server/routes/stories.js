@@ -4,25 +4,17 @@ const auth = require('../middlewares/auth');
 const storiesController = require('../controllers/stories');
 const admin = require('../middlewares/admin');
 
-// Add these routes
-router.put('/:id', auth, storiesController.updateStory);
-router.delete('/:id', auth, admin, storiesController.deleteStory);
+// Specific routes first!
+router.get('/search', storiesController.searchStories);
 router.get('/admin/pending', auth, admin, storiesController.getPendingStories);
 
-// @route   GET api/stories
-// @desc    Get all stories
-// @access  Public
 router.get('/', storiesController.getStories);
-
-// @route   GET api/stories/:id
-// @desc    Get single story
-// @access  Public
-router.get('/:id', storiesController.getStory);
-
-// @route   POST api/stories
-// @desc    Create story
-// @access  Private
 router.post('/', auth, storiesController.createStory);
-router.get('/search', storiesController.searchStories);
 
+// Now add the generic :id routes after
+router.get('/:id', storiesController.getStory);
+router.put('/:id', auth, storiesController.updateStory);
+router.delete('/:id', auth, admin, storiesController.deleteStory);
+
+// Add this export line (was missing)
 module.exports = router;

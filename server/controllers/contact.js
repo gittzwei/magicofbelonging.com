@@ -1,53 +1,58 @@
 const nodemailer = require('nodemailer');
+const sanitizeHtml = require('sanitize-html');
+
+// Create transporter once (reused for all emails)
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
 
 exports.sendContactMessage = async (req, res) => {
   const { name, email, message } = req.body;
 
-  try {
-    // Create transporter
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
+  // Validate input
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
 
-    // Email options
-    const mailOptions = {
-      from: email,
+  try {
+    // Admin notification
+    await transporter.sendMail({
+      from: `"Website Contact" <${process.env.EMAIL_USER}>`,
+      replyTo: email,
       to: process.env.ADMIN_EMAIL,
       subject: `New Contact Message from ${name}`,
-      text: message,
       html: `
         <h3>New Contact Message</h3>
-        <p><strong>From:</strong> ${name} (${email})</p>
+        <p><strong>From:</strong> ${sanitizeHtml(name)} (${sanitizeHtml(email)})</p>
         <p><strong>Message:</strong></p>
-        <p>${message}</p>
+        <p>${sanitizeHtml(message)}</p>
       `
-    };
+    });
 
-    // Send email
-    await transporter.sendMail(mailOptions);
+    // User confirmation
+    await transporter.sendMail({
+      from: `"Magic of Belonging" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Thank you for contacting us',
+      html: `
+        <h3>Hi ${sanitizeHtml(name)},</h3>
+        <p>We've received your message and will respond soon.</p>
+        <p><strong>Your message:</strong></p>
+        <blockquote>${sanitizeHtml(message)}</blockquote>
+        <p>Best regards,<br>The Magic of Belonging Team</p>
+      `
+    });
 
-    res.json({ msg: 'Message sent successfully' });
+    res.json({ success: true, message: 'Message sent successfully' });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+    console.error('Email send error:', err);
+    res.status(500).json({ 
+      error: 'Message could not be sent',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
-  // Add to sendContactMessage function
-// After sending to admin, send confirmation to user
-const userMailOptions = {
-  from: process.env.EMAIL_USER,
-  to: email,
-  subject: 'Thank you for contacting Magic of Belonging',
-  text: `Hi ${name},\n\nThank you for your message. We've received it and will get back to you soon.\n\nBest regards,\nThe Magic of Belonging Team`,
-  html: `
-    <h3>Hi ${name},</h3>
-    <p>Thank you for your message. We've received it and will get back to you soon.</p>
-    <p>Best regards,<br>The Magic of Belonging Team</p>
-  `
-};
-
-await transporter.sendMail(userMailOptions);
 };
